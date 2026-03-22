@@ -54,35 +54,48 @@ footer{text-align:center;padding:20px;background:#111;color:#fff;margin-top:40px
 </footer>
 
 <script>
-// 🔥 STEP 1: Replace with your Google Sheet Web App URL
 const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT5YDxOtOu5RDc8F_SW6NF-4hhL6Sd1H-16ZzaLAU8e_5lMLyopldwWK9VhAxZWeTLkwdJLWOMf2LMT/pub?gid=0&single=true&output=csv";
 
-async function loadProducts(){
-    try{
+// Function to parse CSV (handles quoted commas)
+function parseCSV(text) {
+    const rows = text.trim().split("\n");
+    const headers = rows.shift().match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+    return rows.map(row => {
+        const values = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+        let obj = {};
+        headers.forEach((h, i) => {
+            if (!values[i]) return;
+            obj[h.replace(/"/g,'')] = values[i].replace(/"/g,'');
+        });
+        return obj;
+    }).filter(item => item.name && item.price && item.image); // Remove empty rows
+}
+
+async function loadProducts() {
+    try {
         const res = await fetch(sheetURL);
-        const data = await res.json();
+        const csv = await res.text();
+        const data = parseCSV(csv);
 
         const container = document.getElementById("product-list");
         container.innerHTML = "";
 
         data.forEach(item => {
             const isAdmin = window.location.search.includes("admin=true");
-
             container.innerHTML += `
                 <div class="card">
-                    <img src="${item.image}" alt="">
+                    <img src="${item.image}" alt="${item.name}">
                     <div class="card-content">
                         <h3>${item.name}</h3>
                         <p>₱${item.price}</p>
-                        
                         ${isAdmin && item.link ? `<a href="${item.link}" target="_blank" style="display:inline-block;margin-top:10px;padding:8px 12px;background:#d4a373;color:#fff;text-decoration:none;border-radius:6px;">View Affiliate Link</a>` : ``}
                     </div>
                 </div>
             `;
         });
 
-    }catch(err){
-        console.error(err);
+    } catch (err) {
+        console.error("Error loading products:", err);
     }
 }
 
@@ -91,39 +104,3 @@ loadProducts();
 
 </body>
 </html>
-
-
-<!-- ================= SETUP GUIDE =================
-
-STEP 1: Create Google Sheet
-Columns:
-name | price | image
-
-STEP 2: Open Extensions > Apps Script
-Paste this code:
-
-function doGet() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Sheet1");
-  const data = sheet.getDataRange().getValues();
-  const headers = data.shift();
-
-  const result = data.map(row => {
-    let obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
-    return obj;
-  });
-
-  return ContentService
-    .createTextOutput(JSON.stringify(result))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-STEP 3: Deploy
-Deploy > New deployment > Web App
-Access: Anyone
-
-STEP 4: Copy URL and paste in sheetURL
-
-Now every time you update your Google Sheet, your website updates automatically 🔥
-
-================================================= -->
